@@ -23,13 +23,13 @@
    addMessageListener, removeMessageListener, sendAsyncMessage, outerShutdown
  */
 
+'use strict';
+
 // For non background pages
 
 /******************************************************************************/
 
 (function(self) {
-
-'use strict';
 
 // https://github.com/chrisaljoudi/uBlock/issues/464
 if ( document instanceof HTMLDocument === false ) {
@@ -53,6 +53,18 @@ self.rpc = self.rpc || function(){};
 /******************************************************************************/
 
 var vAPI = self.vAPI = self.vAPI || {};
+
+/******************************************************************************/
+
+var referenceCounter = 0;
+
+vAPI.lock = function() {
+    referenceCounter += 1;
+};
+
+vAPI.unlock = function() {
+    referenceCounter -= 1;
+};
 
 /******************************************************************************/
 

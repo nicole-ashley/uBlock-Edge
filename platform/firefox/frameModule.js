@@ -207,16 +207,19 @@ var contentObserver = {
         // - Enable uBlock
         // - Services and all other global variables are undefined
         // Hopefully will eventually understand why this happens.
-        if ( Services === undefined ) {
-            return this.ACCEPT;
-        }
-
-        if ( !context ) {
+        if ( Services === undefined || !context ) {
             return this.ACCEPT;
         }
 
         if ( type === this.MAIN_FRAME ) {
             this.handlePopup(location, origin, context);
+        }
+
+        // https://bugzilla.mozilla.org/show_bug.cgi?id=1232354
+        // For modern versions of Firefox, the frameId/parentFrameId
+        // information can be found in channel.loadInfo of the HTTP observer.
+        if ( this.canE10S ) {
+            return this.ACCEPT;
         }
 
         if ( !location.schemeIs('http') && !location.schemeIs('https') ) {
@@ -231,17 +234,17 @@ var contentObserver = {
             context = (context.ownerDocument || context).defaultView;
         }
 
-        // The context for the toolbar popup is an iframe element here,
-        // so check context.top instead of context
-        if ( !context.top || !context.location ) {
+        // https://github.com/gorhill/uBlock/issues/1893
+        // I don't know why this happens. I observed that when it occurred, the
+        // resource was not seen by the HTTP observer, as if it was a spurious
+        // call to shouldLoad().
+        if ( !context ) {
             return this.ACCEPT;
         }
 
-        // https://bugzilla.mozilla.org/show_bug.cgi?id=1232354
-        // For top-level resources, no need to send information to the
-        // main process.
-        let isTopContext = context === context.top;
-        if ( isTopContext && this.canE10S ) {
+        // The context for the toolbar popup is an iframe element here,
+        // so check context.top instead of context
+        if ( !context.top || !context.location ) {
             return this.ACCEPT;
         }
 
@@ -250,6 +253,7 @@ var contentObserver = {
             return this.ACCEPT;
         }
 
+        let isTopContext = context === context.top;
         var parentFrameId;
         if ( isTopContext ) {
             parentFrameId = -1;
