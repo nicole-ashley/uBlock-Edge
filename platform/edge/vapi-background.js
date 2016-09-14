@@ -1314,7 +1314,7 @@ vAPI.cloud = (function() {
         pull: noop,
         getOptions: noop,
         setOptions: noop,
-        supported: false
+        isSupported: false
     };
 })();
 

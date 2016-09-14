@@ -669,6 +669,11 @@ var onMessage = function(request, sender, callback) {
     case 'cloudPush':
         return vAPI.cloud.push(request.datakey, request.data, callback);
 
+    case 'cloudIsSupported':
+        if (typeof vAPI.cloud.isSupported !== "undefined") {
+            callback(vAPI.cloud.isSupported);
+        }
+
     default:
         break;
     }
