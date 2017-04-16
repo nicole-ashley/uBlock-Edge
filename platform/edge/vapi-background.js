@@ -57,9 +57,11 @@ vAPI.app.restart = function() {
 
 // browser.storage.local.get(null, function(bin){ console.debug('%o', bin); });
 
-vAPI.storage = new PrefixedStorage('settings');
+vAPI.storage = browser.storage.local;
 
-vAPI.cacheStorage = (function() {
+// Edge got unlimited local storage at the same time as it got sync storage
+var hasUnlimitedLocalStorage = browser.storage.sync instanceof Object;
+vAPI.cacheStorage = hasUnlimitedLocalStorage ? browser.storage.local : (function() {
     const STORAGE_NAME = 'uBlockStorage';
     const db = getDb();
 
@@ -207,59 +209,6 @@ vAPI.cacheStorage = (function() {
         }, {});
     }
 }());
-
-function PrefixedStorage(prefix) {
-    const storage = browser.storage.local;
-    return {get, set, remove, clear: storage.clear, getBytesInUse: storage.getBytesInUse};
-
-    function get(key, callback) {
-        if (typeof key === 'string') {
-            key = prefixKey(key);
-        } else if (Array.isArray(key)) {
-            key = key.map(item => prefixKey(item));
-        } else if (typeof key === 'object') {
-            key = prefixKeysInObject(key);
-        }
-        return storage.get(key, (response) => {
-            if(typeof response === 'object') {
-                callback(removePrefixesFromObject(response));
-            } else {
-                callback(response);
-            }
-        });
-    }
-
-    function set(data, callback) {
-        data = prefixKeysInObject(data);
-        return storage.set(data, callback);
-    }
-
-    function remove(key, callback) {
-        key = [].concat(key).map(item => prefixKey(item));
-        return storage.remove(key, callback);
-    }
-
-    function prefixKey(key) {
-        return [prefix, key].join('/');
-    }
-
-    function prefixKeysInObject(obj) {
-        return Object.keys(obj).reduce((output, currentValue) => {
-            output[prefixKey(currentValue)] = obj[currentValue];
-            return output;
-        }, {});
-    }
-
-    function removePrefixesFromObject(obj) {
-        return Object.keys(obj).reduce((output, currentValue) => {
-            const prefix = prefixKey('');
-            const key = currentValue.indexOf(prefix) === 0 ?
-                currentValue.substr(prefix.length) : currentValue;
-            output[key] = obj[currentValue];
-            return output;
-        }, {});
-    }
-};
 
 /******************************************************************************/
 /******************************************************************************/
