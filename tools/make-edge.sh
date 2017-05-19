@@ -18,13 +18,22 @@ cp -R src/lib               $DES/
 cp -R src/_locales          $DES/
 cp -R $DES/_locales/nb      $DES/_locales/no
 cp src/*.html               $DES/
-cp platform/edge/*.js   $DES/js/
-cp -R platform/edge/img $DES/
-cp platform/edge/*.html $DES/
-cp platform/edge/*.json $DES/
+cp platform/edge/*.js       $DES/js/
+cp -R platform/edge/img     $DES/
+cp platform/edge/*.html     $DES/
+cp platform/edge/*.json     $DES/
 cp LICENSE.txt              $DES/
 
+# Edge doesn't support 'fullwide' as a date format
 sed -i "s/'fullwide',\s*//g" $DES/js/*.js
+
+# Edge doesn't support loading local files without extensions
+mv $DES/assets/thirdparties/mirror1.malwaredomains.com/files/justdomains $DES/assets/thirdparties/mirror1.malwaredomains.com/files/justdomains.txt
+mv $DES/assets/thirdparties/pgl.yoyo.org/as/serverlist $DES/assets/thirdparties/pgl.yoyo.org/as/serverlist.txt
+sed -i "s/files\/justdomains/files\/justdomains.txt/g" $DES/assets/checksums.txt
+sed -i "s/as\/serverlist/as\/serverlist.txt/g" $DES/assets/checksums.txt
+sed -i "s/files\/justdomains\":/files\/justdomains.txt\":/g" $DES/assets/ublock/filter-lists.json
+sed -i "s/as\/serverlist\":/as\/serverlist.txt\":/g" $DES/assets/ublock/filter-lists.json
 
 if [ "$1" = all ]; then
     echo "*** uBlock0.edge: Creating package..."
