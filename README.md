@@ -55,7 +55,7 @@ To benefit from uBlock Origin's higher efficiency, it's advised that you don't u
 
 ## Release History
 
-See the [releases pages](https://github.com/gorhill/uBlock/releases) for a history of releases and highlights for each release.
+See the [releases pages](https://github.com/nikrolls/uBlock-Edge/releases) for a history of releases and highlights for each release.
 
 ## About
 
