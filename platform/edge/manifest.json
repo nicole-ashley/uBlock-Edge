@@ -52,7 +52,7 @@
         }
     ],
     "incognito": "split",
-    "minimum_edge_version": "40.15063",
+    "minimum_edge_version": "40.15063.0.0",
     "optional_permissions": [ "file:///*" ],
     "options_page": "dashboard.html",
     "options_ui": {
