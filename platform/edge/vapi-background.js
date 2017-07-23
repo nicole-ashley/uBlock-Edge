@@ -35,7 +35,13 @@ var browser = self.browser;
 var manifest = browser.runtime.getManifest();
 
 vAPI.edge = true;
-vAPI.cantWebsocket = true; 
+vAPI.edgeVersion = (function(){
+    var matches = /\bEdge\/(\d+\.\d+)\b/.exec(navigator.userAgent);
+    return matches !== null ? parseInt(matches[1], 10) : NaN;
+})();
+vAPI.cantWebsocket =
+    browser.webRequest.ResourceType instanceof Object === false  ||
+    browser.webRequest.ResourceType.WEBSOCKET !== 'websocket';
 
 var noopFunc = function(){};
 
@@ -622,12 +628,12 @@ vAPI.tabs.open = function(details) {
     var targetURLWithoutHash = pos === -1 ? targetURL : targetURL.slice(0, pos);
 
     browser.tabs.query({ url: targetURLWithoutHash }, function(tabs) {
-        var tab = tabs[0];
+        if ( browser.runtime.lastError ) { /* noop */ }
+        var tab = Array.isArray(tabs) && tabs[0];
         if ( !tab ) {
             wrapper();
             return;
         }
-
         var _details = {
             active: true,
             url: undefined
@@ -1338,6 +1344,11 @@ vAPI.contextMenu = {
         }
     }
 };
+
+/******************************************************************************/
+/******************************************************************************/
+
+vAPI.commands = browser.commands;
 
 /******************************************************************************/
 /******************************************************************************/

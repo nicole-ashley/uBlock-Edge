@@ -68,8 +68,12 @@
     "description":"English: or"
   },
   "popupTipDashboard":{
-    "message":"Щракнете, за да отворите таблото",
+    "message":"Табло с настройки",
     "description":"English: Click to open the dashboard"
+  },
+  "popupTipZapper":{
+    "message":"Премахване на отделен елемент",
+    "description":"Tooltip for the element-zapper icon in the popup panel"
   },
   "popupTipPicker":{
     "message":"Блокиране на отделен елемент",

@@ -105,7 +105,6 @@ var µBlock = (function() { // jshint ignore:line
             'behind-the-scene',
             'chrome-extension-scheme',
             'chrome-scheme',
-            'loopconversation.about-scheme',
             'moz-extension-scheme',
             'opera-scheme',
             'vivaldi-scheme',
@@ -121,8 +120,8 @@ var µBlock = (function() { // jshint ignore:line
 
         // read-only
         systemSettings: {
-            compiledMagic: 'fxtcjjhbhyiw',
-            selfieMagic: 'fxtcjjhbhyiw'
+            compiledMagic: 'pwvcdyqfkuek',
+            selfieMagic: 'pwvcdyqfkuek'
         },
 
         restoreBackupSettings: {
@@ -143,7 +142,7 @@ var µBlock = (function() { // jshint ignore:line
         selectedFilterLists: [],
         availableFilterLists: {},
 
-        selfieAfter: 23 * oneMinute,
+        selfieAfter: 17 * oneMinute,
 
         pageStores: {},
         pageStoresToken: 0,
@@ -158,6 +157,7 @@ var µBlock = (function() { // jshint ignore:line
         mouseY: -1,
         mouseURL: '',
         epickerTarget: '',
+        epickerZap: false,
         epickerEprom: null,
 
         scriptlets: {
@@ -170,4 +170,3 @@ var µBlock = (function() { // jshint ignore:line
 })();
 
 /******************************************************************************/
-
