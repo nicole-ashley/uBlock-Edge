@@ -25,7 +25,7 @@
     "content_scripts": [
         {
             "matches": ["http://*/*", "https://*/*"],
-            "js": ["js/vapi-client.js", "js/contentscript.js"],
+            "js": ["js/vapi.js", "js/vapi-client.js", "js/contentscript.js"],
             "run_at": "document_start",
             "all_frames": true
         },
@@ -44,7 +44,7 @@
     },
     "incognito": "split",
     "manifest_version": 2,
-    "minimum_chrome_version": "38.0",
+    "minimum_opera_version": "25.0",
     "name": "uBlock Origin",
     "optional_permissions": [ "file:///*" ],
     "options_page": "dashboard.html",

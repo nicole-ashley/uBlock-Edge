@@ -97,6 +97,7 @@ var staticFilterTypes = {
     'css': 'stylesheet',
     'frame': 'subdocument',
     'ping': 'other',
+    'object_subrequest': 'object',
     'xhr': 'xmlhttprequest'
 };
 
@@ -411,12 +412,8 @@ var synchronizeTabIds = function(newTabIds) {
     var rowVoided = false;
     var trs;
     for ( var tabId in oldTabIds ) {
-        if ( oldTabIds.hasOwnProperty(tabId) === false ) {
-            continue;
-        }
-        if ( newTabIds.hasOwnProperty(tabId) ) {
-            continue;
-        }
+        if ( oldTabIds.hasOwnProperty(tabId) === false ) { continue; }
+        if ( newTabIds.hasOwnProperty(tabId) ) { continue; }
         // Mark or remove voided rows
         trs = uDom('.tab_' + tabId);
         if ( autoDeleteVoidRows ) {
@@ -439,9 +436,7 @@ var synchronizeTabIds = function(newTabIds) {
     var option;
     for ( var i = 0, j = 2; i < tabIds.length; i++ ) {
         tabId = tabIds[i];
-        if ( tabId === noTabId ) {
-            continue;
-        }
+        if ( tabId === noTabId ) { continue; }
         option = select.options[j];
         if ( !option ) {
             option = document.createElement('option');
@@ -1514,8 +1509,8 @@ var cleanBuffer = function() {
 
 /******************************************************************************/
 
-var toggleCompactView = function() {
-    uDom.nodeFromId('netInspector').classList.toggle('compactView');
+var toggleVCompactView = function() {
+    uDom.nodeFromId('netInspector').classList.toggle('vCompact');
 };
 
 /******************************************************************************/
@@ -1645,7 +1640,7 @@ uDom('#pageSelector').on('change', pageSelectorChanged);
 uDom('#refresh').on('click', reloadTab);
 uDom('#showdom').on('click', toggleInspectors);
 
-uDom('#compactViewToggler').on('click', toggleCompactView);
+uDom('#netInspector .vCompactToggler').on('click', toggleVCompactView);
 uDom('#clean').on('click', cleanBuffer);
 uDom('#clear').on('click', clearBuffer);
 uDom('#maxEntries').on('change', onMaxEntriesChanged);

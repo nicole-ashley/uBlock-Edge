@@ -2,7 +2,7 @@
     "manifest_version": 2,
 
     "name": "uBlock Origin",
-    "version": "1.13.8",
+    "version": "1.14.22",
 
     "commands": {
         "launch-element-zapper": {
@@ -40,7 +40,7 @@
     "content_scripts": [
         {
             "matches": ["http://*/*", "https://*/*"],
-            "js": ["js/vapi-client.js", "js/contentscript.js"],
+            "js": ["js/vapi.js", "js/vapi-client.js", "js/contentscript.js"],
             "run_at": "document_start",
             "all_frames": true
         },

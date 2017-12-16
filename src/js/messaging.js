@@ -88,7 +88,10 @@ var onMessage = function(request, sender, callback) {
         break;
     }
 
-    var tabId = sender && sender.tab ? sender.tab.id : 0;
+    // The concatenation with the empty string ensure that the resulting value
+    // is a string. This is important since tab id values are assumed to be
+    // of string type.
+    var tabId = sender && sender.tab ? '' + sender.tab.id : 0;
 
     // Sync
     var response;
@@ -104,8 +107,6 @@ var onMessage = function(request, sender, callback) {
 
     case 'cosmeticFiltersInjected':
         µb.cosmeticFilteringEngine.addToSelectorCache(request);
-        /* falls through */
-    case 'cosmeticFiltersActivated':
         // Net-based cosmetic filters are of no interest for logging purpose.
         if ( µb.logger.isEnabled() && request.type !== 'net' ) {
             µb.logCosmeticFilters(tabId);
@@ -137,7 +138,7 @@ var onMessage = function(request, sender, callback) {
 
     case 'launchElementPicker':
         // Launched from some auxiliary pages, clear context menu coords.
-        µb.mouseX = µb.mouseY = -1;
+        µb.mouseEventRegister.x = µb.mouseEventRegister.y = -1;
         µb.elementPickerExec(request.tabId, request.targetURL, request.zap);
         break;
 
@@ -146,9 +147,10 @@ var onMessage = function(request, sender, callback) {
         break;
 
     case 'mouseClick':
-        µb.mouseX = request.x;
-        µb.mouseY = request.y;
-        µb.mouseURL = request.url;
+        µb.mouseEventRegister.tabId = tabId;
+        µb.mouseEventRegister.x = request.x;
+        µb.mouseEventRegister.y = request.y;
+        µb.mouseEventRegister.url = request.url;
         break;
 
     case 'reloadTab':
@@ -452,56 +454,6 @@ vAPI.messaging.listen('popupPanel', onMessage);
 
 /******************************************************************************/
 
-var µb = µBlock;
-
-/******************************************************************************/
-
-var tagNameToRequestTypeMap = {
-     'embed': 'object',
-    'iframe': 'sub_frame',
-       'img': 'image',
-    'object': 'object'
-};
-
-/******************************************************************************/
-
-// Evaluate many requests.
-
-// https://github.com/gorhill/uBlock/issues/1782
-//   Treat `data:` URIs as 1st-party resources.
-
-var filterRequests = function(pageStore, details) {
-    var requests = details.requests;
-    if ( µb.userSettings.collapseBlocked === false ) {
-        return requests;
-    }
-
-    //console.debug('messaging.js/contentscript-end.js: processing %d requests', requests.length);
-
-    var hostnameFromURI = µb.URI.hostnameFromURI,
-        redirectEngine = µb.redirectEngine,
-        punycodeURL = vAPI.punycodeURL;
-
-    // Create evaluation context
-    var context = pageStore.createContextFromFrameHostname(details.pageHostname),
-        request,
-        i = requests.length;
-    while ( i-- ) {
-        request = requests[i];
-        context.requestURL = punycodeURL(request.url);
-        context.requestHostname = hostnameFromURI(context.requestURL);
-        context.requestType = tagNameToRequestTypeMap[request.tag];
-        if ( pageStore.filterRequest(context) !== 1 ) { continue; }
-        // Redirected? (We do not hide redirected resources.)
-        request.collapse = redirectEngine.matches(context) !== true;
-    }
-
-    context.dispose();
-    return requests;
-};
-
-/******************************************************************************/
-
 var onMessage = function(request, sender, callback) {
     // Async
     switch ( request.what ) {
@@ -510,42 +462,55 @@ var onMessage = function(request, sender, callback) {
     }
 
     // Sync
-    var response;
+    var µb = µBlock,
+        response,
+        tabId,
+        pageStore;
 
-    var pageStore;
     if ( sender && sender.tab ) {
-        pageStore = µb.pageStoreFromTabId(sender.tab.id);
+        tabId = sender.tab.id;
+        pageStore = µb.pageStoreFromTabId(tabId);
     }
 
     switch ( request.what ) {
+    case 'getCollapsibleBlockedRequests':
+        response = {
+            id: request.id,
+            hash: request.hash,
+            netSelectorCacheCountMax:
+                µb.cosmeticFilteringEngine.netSelectorCacheCountMax
+        };
+        if (
+            µb.userSettings.collapseBlocked &&
+            pageStore &&
+            pageStore.getNetFilteringSwitch()
+        ) {
+            pageStore.getBlockedResources(request, response);
+        }
+        break;
+
     case 'retrieveContentScriptParameters':
         if ( pageStore && pageStore.getNetFilteringSwitch() ) {
             response = {
-                loggerEnabled: µb.logger.isEnabled(),
                 collapseBlocked: µb.userSettings.collapseBlocked,
-                noCosmeticFiltering: µb.cosmeticFilteringEngine.acceptedCount === 0 || pageStore.noCosmeticFiltering === true,
-                noGenericCosmeticFiltering: pageStore.noGenericCosmeticFiltering === true
+                noCosmeticFiltering: pageStore.noCosmeticFiltering === true,
+                noGenericCosmeticFiltering:
+                    pageStore.noGenericCosmeticFiltering === true
             };
-            response.specificCosmeticFilters = µb.cosmeticFilteringEngine.retrieveDomainSelectors(
-                request,
-                response.noCosmeticFiltering
-            );
+            response.specificCosmeticFilters =
+                µb.cosmeticFilteringEngine
+                  .retrieveDomainSelectors(request, sender, response);
+            if ( request.isRootFrame && µb.logger.isEnabled() ) {
+                µb.logCosmeticFilters(tabId);
+            }
         }
         break;
 
     case 'retrieveGenericCosmeticSelectors':
         if ( pageStore && pageStore.getGenericCosmeticFilteringSwitch() ) {
             response = {
-                result: µb.cosmeticFilteringEngine.retrieveGenericSelectors(request)
-            };
-        }
-        break;
-
-    case 'filterRequests':
-        if ( pageStore && pageStore.getNetFilteringSwitch() ) {
-            response = {
-                result: filterRequests(pageStore, request),
-                netSelectorCacheCountMax: µb.cosmeticFilteringEngine.netSelectorCacheCountMax
+                result: µb.cosmeticFilteringEngine
+                          .retrieveGenericSelectors(request, sender)
             };
         }
         break;
@@ -604,15 +569,14 @@ var onMessage = function(request, sender, callback) {
             callback({
                 frameContent: this.responseText.replace(reStrings, replacer),
                 target: µb.epickerTarget,
-                clientX: µb.mouseX,
-                clientY: µb.mouseY,
+                clientX: µb.mouseEventRegister.x,
+                clientY: µb.mouseEventRegister.y,
                 zap: µb.epickerZap,
                 eprom: µb.epickerEprom
             });
 
             µb.epickerTarget = '';
-            µb.mouseX = -1;
-            µb.mouseY = -1;
+            µb.mouseEventRegister.x = µb.mouseEventRegister.y = -1;
         };
         xhr.send();
         return;

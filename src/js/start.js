@@ -29,8 +29,6 @@
 
 µBlock.restart = (function() {
 
-//quickProfiler.start('start.js');
-
 /******************************************************************************/
 
 var µb = µBlock;
@@ -85,8 +83,6 @@ var onAllReady = function() {
         ]);
     }
 
-    //quickProfiler.stop(0);
-
     µb.contextMenu.update(null);
     µb.firstInstall = false;
 
@@ -127,7 +123,10 @@ var onVersionReady = function(lastVersion) {
 /******************************************************************************/
 
 var onSelfieReady = function(selfie) {
-    if ( selfie === null || selfie.magic !== µb.systemSettings.selfieMagic ) {
+    if (
+        selfie instanceof Object === false ||
+        selfie.magic !== µb.systemSettings.selfieMagic
+    ) {
         return false;
     }
     if ( publicSuffixList.fromSelfie(selfie.publicSuffixList) !== true ) {
@@ -221,13 +220,13 @@ var onFirstFetchReady = function(fetched) {
     onNetWhitelistReady(fetched.netWhitelist);
     onVersionReady(fetched.version);
 
-    // If we have a selfie, skip loading PSL, filters
-    if ( onSelfieReady(fetched.selfie) ) {
-        onAllReady();
-        return;
-    }
-
-    µb.loadPublicSuffixList(onPSLReady);
+    // If we have a selfie, skip loading PSL, filter lists
+    vAPI.cacheStorage.get('selfie', function(bin) {
+        if ( bin instanceof Object && onSelfieReady(bin.selfie) ) {
+            return onAllReady();
+        }
+        µb.loadPublicSuffixList(onPSLReady);
+    });
 };
 
 /******************************************************************************/
@@ -266,7 +265,6 @@ var onSelectedFilterListsLoaded = function() {
         'lastBackupFile': '',
         'lastBackupTime': 0,
         'netWhitelist': µb.netWhitelistDefault,
-        'selfie': null,
         'selfieMagic': '',
         'version': '0.0.0.0'
     };

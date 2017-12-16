@@ -28,8 +28,7 @@
 (function() {
 
 /******************************************************************************/
-
-var vAPI = self.vAPI = self.vAPI || {};
+/******************************************************************************/
 
 var chrome = self.chrome;
 var manifest = chrome.runtime.getManifest();
@@ -39,16 +38,35 @@ vAPI.chromiumVersion = (function(){
     var matches = /\bChrom(?:e|ium)\/(\d+)\b/.exec(navigator.userAgent);
     return matches !== null ? parseInt(matches[1], 10) : NaN;
     })();
+
 vAPI.cantWebsocket =
     chrome.webRequest.ResourceType instanceof Object === false  ||
     chrome.webRequest.ResourceType.WEBSOCKET !== 'websocket';
+
+vAPI.webextFlavor = '';
+if (
+    self.browser instanceof Object &&
+    typeof self.browser.runtime.getBrowserInfo === 'function'
+) {
+    self.browser.runtime.getBrowserInfo().then(function(info) {
+        vAPI.webextFlavor = info.vendor + '-' + info.name + '-' + info.version;
+    });
+}
+
+// https://issues.adblockplus.org/ticket/5695
+// - Good idea, adopted: cleaner way to detect user-stylesheet support.
+vAPI.supportsUserStylesheets = 
+    chrome.extensionTypes instanceof Object &&
+    chrome.extensionTypes.CSSOrigin instanceof Object &&
+    'USER' in chrome.extensionTypes.CSSOrigin;
+vAPI.insertCSS = chrome.tabs.insertCSS;
 
 var noopFunc = function(){};
 
 /******************************************************************************/
 
 vAPI.app = {
-    name: manifest.name,
+    name: manifest.name.replace(' dev build', ''),
     version: manifest.version
 };
 
@@ -301,14 +319,19 @@ vAPI.tabs.registerListeners = function() {
     };
 
     var onCreatedNavigationTarget = function(details) {
-        //console.debug('onCreatedNavigationTarget: popup candidate tab id %d = "%s"', details.tabId, details.url);
+        if ( typeof details.url !== 'string' ) {
+            details.url = '';
+        }
         if ( reGoodForWebRequestAPI.test(details.url) === false ) {
             details.frameId = 0;
             details.url = sanitizeURL(details.url);
             onNavigationClient(details);
         }
         if ( typeof vAPI.tabs.onPopupCreated === 'function' ) {
-            vAPI.tabs.onPopupCreated(details.tabId.toString(), details.sourceTabId.toString());
+            vAPI.tabs.onPopupCreated(
+                details.tabId.toString(),
+                details.sourceTabId.toString()
+            );
         }
     };
 
@@ -327,10 +350,17 @@ vAPI.tabs.registerListeners = function() {
     };
 
     var onActivated = function(details) {
-        vAPI.contextMenu.onMustUpdate(details.tabId);
+        if ( vAPI.contextMenu instanceof Object ) {
+            vAPI.contextMenu.onMustUpdate(details.tabId);
+        }
     };
 
+    // https://github.com/gorhill/uBlock/issues/3073
+    // - Fall back to `tab.url` when `changeInfo.url` is not set.
     var onUpdated = function(tabId, changeInfo, tab) {
+        if ( typeof changeInfo.url !== 'string' ) {
+            changeInfo.url = tab && tab.url;
+        }
         if ( changeInfo.url ) {
             changeInfo.url = sanitizeURL(changeInfo.url);
         }
@@ -470,12 +500,19 @@ vAPI.tabs.open = function(details) {
         return;
     }
 
+    // https://github.com/gorhill/uBlock/issues/3053#issuecomment-332276818
+    // - Do not try to lookup uBO's own pages with FF 55 or less.
+    if ( /^Mozilla-Firefox-5[2-5]\./.test(vAPI.webextFlavor) ) {
+        wrapper();
+        return;
+    }
+
     // https://developer.chrome.com/extensions/tabs#method-query
     // "Note that fragment identifiers are not matched."
     // It's a lie, fragment identifiers ARE matched. So we need to remove the
     // fragment.
-    var pos = targetURL.indexOf('#');
-    var targetURLWithoutHash = pos === -1 ? targetURL : targetURL.slice(0, pos);
+    var pos = targetURL.indexOf('#'),
+        targetURLWithoutHash = pos === -1 ? targetURL : targetURL.slice(0, pos);
 
     chrome.tabs.query({ url: targetURLWithoutHash }, function(tabs) {
         if ( chrome.runtime.lastError ) { /* noop */ }
@@ -608,38 +645,80 @@ vAPI.tabs.injectScript = function(tabId, details, callback) {
 // Since we may be called asynchronously, the tab id may not exist
 // anymore, so this ensures it does still exist.
 
-vAPI.setIcon = function(tabId, iconStatus, badge) {
-    tabId = toChromiumTabId(tabId);
-    if ( tabId === 0 ) {
-        return;
-    }
+// https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/browserAction#Browser_compatibility
+//   Firefox for Android does no support browser.browserAction.setIcon().
 
-    var onIconReady = function() {
-        if ( vAPI.lastError() ) {
-            return;
+vAPI.setIcon = (function() {
+    var browserAction = chrome.browserAction,
+        titleTemplate = chrome.runtime.getManifest().name + ' ({badge})';
+    var iconPaths = [
+        {
+            '19': 'img/browsericons/icon19-off.png',
+            '38': 'img/browsericons/icon38-off.png'
+        },
+        {
+            '19': 'img/browsericons/icon19.png',
+            '38': 'img/browsericons/icon38.png'
         }
-        chrome.browserAction.setBadgeText({ tabId: tabId, text: badge });
-        if ( badge !== '' ) {
-            chrome.browserAction.setBadgeBackgroundColor({
-                tabId: tabId,
-                color: '#666'
+    ];
+
+    var onTabReady = function(tab, status, badge) {
+        if ( vAPI.lastError() || !tab ) { return; }
+
+        if ( browserAction.setIcon !== undefined ) {
+            browserAction.setIcon({
+                tabId: tab.id,
+                path: iconPaths[status === 'on' ? 1 : 0]
+            });
+            browserAction.setBadgeText({
+                tabId: tab.id,
+                text: badge
+            });
+            if ( badge !== '' ) {
+                browserAction.setBadgeBackgroundColor({
+                    tabId: tab.id,
+                    color: '#666'
+                });
+            }
+        }
+
+        if ( browserAction.setTitle !== undefined ) {
+            browserAction.setTitle({
+                tabId: tab.id,
+                title: titleTemplate.replace(
+                    '{badge}',
+                    status === 'on' ? (badge !== '' ? badge : '0') : 'off'
+                )
             });
         }
     };
 
-    var iconPaths = iconStatus === 'on' ?
-        { '19': 'img/browsericons/icon19.png',     '38': 'img/browsericons/icon38.png' } :
-        { '19': 'img/browsericons/icon19-off.png', '38': 'img/browsericons/icon38-off.png' };
+    return function(tabId, iconStatus, badge) {
+        tabId = toChromiumTabId(tabId);
+        if ( tabId === 0 ) { return; }
 
-    chrome.browserAction.setIcon({ tabId: tabId, path: iconPaths }, onIconReady);
-    vAPI.contextMenu.onMustUpdate(tabId);
-};
+        chrome.tabs.get(tabId, function(tab) {
+            onTabReady(tab, iconStatus, badge);
+        });
+
+        if ( vAPI.contextMenu instanceof Object ) {
+            vAPI.contextMenu.onMustUpdate(tabId);
+        }
+    };
+})();
+
+chrome.browserAction.onClicked.addListener(function(tab) {
+    vAPI.tabs.open({
+        select: true,
+        url: 'popup.html?tabId=' + tab.id + '&mobile=1'
+    });
+});
 
 /******************************************************************************/
 /******************************************************************************/
 
 vAPI.messaging = {
-    ports: {},
+    ports: new Map(),
     listeners: {},
     defaultHandler: null,
     NOOPFUNC: noopFunc,
@@ -655,171 +734,180 @@ vAPI.messaging.listen = function(listenerName, callback) {
 /******************************************************************************/
 
 vAPI.messaging.onPortMessage = (function() {
-    var messaging = vAPI.messaging;
-    var toAuxPending = {};
+    var messaging = vAPI.messaging,
+        supportsUserStylesheets = vAPI.supportsUserStylesheets;
 
     // Use a wrapper to avoid closure and to allow reuse.
-    var CallbackWrapper = function(port, request, timeout) {
+    var CallbackWrapper = function(port, request) {
         this.callback = this.proxy.bind(this); // bind once
-        this.init(port, request, timeout);
+        this.init(port, request);
     };
 
-    CallbackWrapper.prototype.init = function(port, request, timeout) {
-        this.port = port;
-        this.request = request;
-        this.timerId = timeout !== undefined ?
-                            vAPI.setTimeout(this.callback, timeout) :
-                            null;
-        return this;
-    };
-
-    CallbackWrapper.prototype.proxy = function(response) {
-        if ( this.timerId !== null ) {
-            clearTimeout(this.timerId);
-            delete toAuxPending[this.timerId];
-            this.timerId = null;
+    CallbackWrapper.prototype = {
+        init: function(port, request) {
+            this.port = port;
+            this.request = request;
+            return this;
+        },
+        proxy: function(response) {
+            // https://github.com/chrisaljoudi/uBlock/issues/383
+            if ( messaging.ports.has(this.port.name) ) {
+                this.port.postMessage({
+                    auxProcessId: this.request.auxProcessId,
+                    channelName: this.request.channelName,
+                    msg: response !== undefined ? response : null
+                });
+            }
+            // Mark for reuse
+            this.port = this.request = null;
+            callbackWrapperJunkyard.push(this);
         }
-        // https://github.com/chrisaljoudi/uBlock/issues/383
-        if ( messaging.ports.hasOwnProperty(this.port.name) ) {
-            this.port.postMessage({
-                auxProcessId: this.request.auxProcessId,
-                channelName: this.request.channelName,
-                msg: response !== undefined ? response : null
-            });
-        }
-        // Mark for reuse
-        this.port = this.request = null;
-        callbackWrapperJunkyard.push(this);
     };
 
     var callbackWrapperJunkyard = [];
 
-    var callbackWrapperFactory = function(port, request, timeout) {
+    var callbackWrapperFactory = function(port, request) {
         var wrapper = callbackWrapperJunkyard.pop();
         if ( wrapper ) {
-            return wrapper.init(port, request, timeout);
+            return wrapper.init(port, request);
         }
-        return new CallbackWrapper(port, request, timeout);
+        return new CallbackWrapper(port, request);
     };
 
-    var toAux = function(details, portFrom) {
-        var port, portTo;
-        var chromiumTabId = toChromiumTabId(details.toTabId);
-
-        // TODO: This could be an issue with a lot of tabs: easy to address
-        //       with a port name to tab id map.
-        for ( var portName in messaging.ports ) {
-            if ( messaging.ports.hasOwnProperty(portName) === false ) {
-                continue;
+    var toFramework = function(request, port, callback) {
+        var sender = port && port.sender;
+        if ( !sender ) { return; }
+        var tabId = sender.tab && sender.tab.id;
+        if ( !tabId ) { return; }
+        var msg = request.msg,
+            toPort;
+        switch ( msg.what ) {
+        case 'connectionAccepted':
+        case 'connectionRefused':
+            toPort = messaging.ports.get(msg.fromToken);
+            if ( toPort !== undefined ) {
+                msg.tabId = tabId.toString();
+                toPort.postMessage(request);
+            } else {
+                msg.what = 'connectionBroken';
+                port.postMessage(request);
             }
-            // When sending to an auxiliary process, the target is always the
-            // port associated with the root frame.
-            port = messaging.ports[portName];
-            if ( port.sender.frameId === 0 && port.sender.tab.id === chromiumTabId ) {
-                portTo = port;
-                break;
+            break;
+        case 'connectionRequested':
+            msg.tabId = '' + tabId.toString();
+            for ( toPort of messaging.ports.values() ) {
+                toPort.postMessage(request);
             }
-        }
-
-        var wrapper;
-        if ( details.auxProcessId !== undefined ) {
-            wrapper = callbackWrapperFactory(portFrom, details, 1023);
-        }
-
-        // Destination not found: 
-        if ( portTo === undefined ) {
-            if ( wrapper !== undefined ) {
-                wrapper.callback();
+            break;
+        case 'connectionBroken':
+        case 'connectionCheck':
+        case 'connectionMessage':
+            toPort = messaging.ports.get(
+                port.name === msg.fromToken ? msg.toToken : msg.fromToken
+            );
+            if ( toPort !== undefined ) {
+                msg.tabId = tabId.toString();
+                toPort.postMessage(request);
+            } else {
+                msg.what = 'connectionBroken';
+                port.postMessage(request);
             }
-            return;
+            break;
+        case 'userCSS':
+            var details = {
+                code: undefined,
+                frameId: sender.frameId,
+                matchAboutBlank: true
+            };
+            if ( supportsUserStylesheets ) {
+                details.cssOrigin = 'user';
+            }
+            if ( msg.add ) {
+                details.runAt = 'document_start';
+            }
+            var cssText;
+            const cssPromises = [];
+            for ( cssText of msg.add ) {
+                details.code = cssText;
+                cssPromises.push(chrome.tabs.insertCSS(tabId, details));
+            }
+            for ( cssText of msg.remove ) {
+                details.code = cssText;
+                cssPromises.push(chrome.tabs.removeCSS(tabId, details));
+            }
+            if ( typeof callback === 'function' ) {
+                Promise.all(cssPromises).then(() => {
+                    callback();
+                }, null);
+            }
+            break;
         }
-
-        // As per HTML5, timer id is always an integer, thus suitable to be
-        // used as a key, and which value is safe to use across process
-        // boundaries.
-        if ( wrapper !== undefined ) {
-            toAuxPending[wrapper.timerId] = wrapper;
-        }
-
-        portTo.postMessage({
-            mainProcessId: wrapper && wrapper.timerId,
-            channelName: details.toChannel,
-            msg: details.msg
-        });
     };
 
-    var toAuxResponse = function(details) {
-        var mainProcessId = details.mainProcessId;
-        if ( mainProcessId === undefined ) {
-            return;
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=1392067
+    //   Workaround: manually remove ports matching removed tab.
+    chrome.tabs.onRemoved.addListener(function(tabId) {
+        for ( var port of messaging.ports.values() ) {
+            var tab = port.sender && port.sender.tab;
+            if ( !tab ) { continue; }
+            if ( tab.id === tabId ) {
+                vAPI.messaging.onPortDisconnect(port);
+            }
         }
-        if ( toAuxPending.hasOwnProperty(mainProcessId) === false ) {
-            return;
-        }
-        var wrapper = toAuxPending[mainProcessId];
-        delete toAuxPending[mainProcessId];
-        wrapper.callback(details.msg);
-    };
+    });
 
     return function(request, port) {
-        // Auxiliary process to auxiliary process
-        if ( request.toTabId !== undefined ) {
-            toAux(request, port);
-            return;
-        }
-
-        // Auxiliary process to auxiliary process: response
-        if ( request.mainProcessId !== undefined ) {
-            toAuxResponse(request);
-            return;
-        }
-
-        // Auxiliary process to main process: prepare response
-        var callback = messaging.NOOPFUNC;
+        // prepare response
+        var callback = this.NOOPFUNC;
         if ( request.auxProcessId !== undefined ) {
             callback = callbackWrapperFactory(port, request).callback;
         }
 
+        // Content process to main process: framework handler.
+        if ( request.channelName === 'vapi' ) {
+            toFramework(request, port, callback);
+            return;
+        }
+
         // Auxiliary process to main process: specific handler
-        var r = messaging.UNHANDLED;
-        var listener = messaging.listeners[request.channelName];
+        var r = this.UNHANDLED,
+            listener = this.listeners[request.channelName];
         if ( typeof listener === 'function' ) {
             r = listener(request.msg, port.sender, callback);
         }
-        if ( r !== messaging.UNHANDLED ) {
-            return;
-        }
+        if ( r !== this.UNHANDLED ) { return; }
 
         // Auxiliary process to main process: default handler
-        r = messaging.defaultHandler(request.msg, port.sender, callback);
-        if ( r !== messaging.UNHANDLED ) {
-            return;
-        }
+        r = this.defaultHandler(request.msg, port.sender, callback);
+        if ( r !== this.UNHANDLED ) { return; }
 
         // Auxiliary process to main process: no handler
-        console.error('uBlock> messaging > unknown request: %o', request);
+        console.error(
+            'vAPI.messaging.onPortMessage > unhandled request: %o',
+            request
+        );
 
         // Need to callback anyways in case caller expected an answer, or
         // else there is a memory leak on caller's side
         callback();
-    };
+    }.bind(vAPI.messaging);
 })();
 
 /******************************************************************************/
 
 vAPI.messaging.onPortDisconnect = function(port) {
-    port.onDisconnect.removeListener(vAPI.messaging.onPortDisconnect);
-    port.onMessage.removeListener(vAPI.messaging.onPortMessage);
-    delete vAPI.messaging.ports[port.name];
-};
+    port.onDisconnect.removeListener(this.onPortDisconnect);
+    port.onMessage.removeListener(this.onPortMessage);
+    this.ports.delete(port.name);
+}.bind(vAPI.messaging);
 
 /******************************************************************************/
 
 vAPI.messaging.onPortConnect = function(port) {
-    port.onDisconnect.addListener(vAPI.messaging.onPortDisconnect);
-    port.onMessage.addListener(vAPI.messaging.onPortMessage);
-    vAPI.messaging.ports[port.name] = port;
-};
+    port.onDisconnect.addListener(this.onPortDisconnect);
+    port.onMessage.addListener(this.onPortMessage);
+    this.ports.set(port.name, port);
+}.bind(vAPI.messaging);
 
 /******************************************************************************/
 
@@ -844,308 +932,18 @@ vAPI.messaging.broadcast = function(message) {
         broadcast: true,
         msg: message
     };
-
-    for ( var portName in this.ports ) {
-        if ( this.ports.hasOwnProperty(portName) === false ) {
-            continue;
-        }
-        this.ports[portName].postMessage(messageWrapper);
+    for ( var port of this.ports.values() ) {
+        port.postMessage(messageWrapper);
     }
 };
 
 /******************************************************************************/
 /******************************************************************************/
 
-vAPI.net = {};
+// https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/contextMenus#Browser_compatibility
+//   Firefox for Android does no support browser.contextMenus.
 
-/******************************************************************************/
-
-vAPI.net.registerListeners = function() {
-    var µb = µBlock,
-        µburi = µb.URI,
-        wrApi = chrome.webRequest;
-
-    // https://bugs.chromium.org/p/chromium/issues/detail?id=410382
-    // Between Chromium 38-48, plug-ins' network requests were reported as
-    // type "other" instead of "object".
-    var is_v38_48 = /\bChrom[a-z]+\/(?:3[89]|4[0-8])\.[\d.]+\b/.test(navigator.userAgent);
-
-    // legacy Chromium understands only these network request types.
-    var validTypes = {
-        main_frame: true,
-        sub_frame: true,
-        stylesheet: true,
-        script: true,
-        image: true,
-        object: true,
-        xmlhttprequest: true,
-        other: true
-    };
-    // modern Chromium/WebExtensions: more types available.
-    if ( wrApi.ResourceType ) {
-        (function() {
-            for ( var typeKey in wrApi.ResourceType ) {
-                if ( wrApi.ResourceType.hasOwnProperty(typeKey) ) {
-                    validTypes[wrApi.ResourceType[typeKey]] = true;
-                }
-            }
-        })();
-    }
-
-    var extToTypeMap = new Map([
-        ['eot','font'],['otf','font'],['svg','font'],['ttf','font'],['woff','font'],['woff2','font'],
-        ['mp3','media'],['mp4','media'],['webm','media'],
-        ['gif','image'],['ico','image'],['jpeg','image'],['jpg','image'],['png','image'],['webp','image']
-    ]);
-
-    var denormalizeTypes = function(aa) {
-        if ( aa.length === 0 ) {
-            return Object.keys(validTypes);
-        }
-        var out = [];
-        var i = aa.length,
-            type,
-            needOther = true;
-        while ( i-- ) {
-            type = aa[i];
-            if ( validTypes[type] ) {
-                out.push(type);
-            }
-            if ( type === 'other' ) {
-                needOther = false;
-            }
-        }
-        if ( needOther ) {
-            out.push('other');
-        }
-        return out;
-    };
-
-    var headerValue = function(headers, name) {
-        var i = headers.length;
-        while ( i-- ) {
-            if ( headers[i].name.toLowerCase() === name ) {
-                return headers[i].value.trim();
-            }
-        }
-        return '';
-    };
-
-    var normalizeRequestDetails = function(details) {
-        details.tabId = details.tabId.toString();
-
-        var type = details.type;
-
-        // https://github.com/gorhill/uBlock/issues/1493
-        // Chromium 49+/WebExtensions support a new request type: `ping`,
-        // which is fired as a result of using `navigator.sendBeacon`.
-        if ( type === 'ping' ) {
-            details.type = 'beacon';
-            return;
-        }
-
-        if ( type === 'imageset' ) {
-            details.type = 'image';
-            return;
-        }
-
-        // The rest of the function code is to normalize type
-        if ( type !== 'other' ) {
-            return;
-        }
-
-        // Try to map known "extension" part of URL to request type.
-        var path = µburi.pathFromURI(details.url),
-            pos = path.indexOf('.', path.length - 6);
-        if ( pos !== -1 && (type = extToTypeMap.get(path.slice(pos + 1))) ) {
-            details.type = type;
-            return;
-        }
-
-        // Try to extract type from response headers if present.
-        if ( details.responseHeaders ) {
-            type = headerValue(details.responseHeaders, 'content-type');
-            if ( type.startsWith('font/') ) {
-                details.type = 'font';
-                return;
-            }
-            if ( type.startsWith('image/') ) {
-                details.type = 'image';
-                return;
-            }
-            if ( type.startsWith('audio/') || type.startsWith('video/') ) {
-                details.type = 'media';
-                return;
-            }
-        }
-
-        // https://github.com/chrisaljoudi/uBlock/issues/862
-        //   If no transposition possible, transpose to `object` as per
-        //   Chromium bug 410382
-        // https://code.google.com/p/chromium/issues/detail?id=410382
-        if ( is_v38_48 ) {
-            details.type = 'object';
-        }
-    };
-
-    // https://bugs.chromium.org/p/chromium/issues/detail?id=129353
-    // https://github.com/gorhill/uBlock/issues/1497
-    // Expose websocket-based network requests to uBO's filtering engine,
-    // logger, etc.
-    // Counterpart of following block of code is found in "vapi-client.js" --
-    // search for "https://github.com/gorhill/uBlock/issues/1497".
-    //
-    // Once uBO 1.11.1 and uBO-Extra 2.12 are widespread, the image-based
-    // handling code can be removed.
-    var onBeforeWebsocketRequest = function(details) {
-        if ( (details.type !== 'image') &&
-             (details.method !== 'HEAD' || details.type !== 'xmlhttprequest')
-        ) {
-            return;
-        }
-        var requestURL = details.url,
-            matches = /[?&]u(?:rl)?=([^&]+)/.exec(requestURL);
-        if ( matches === null ) { return; }
-        details.type = 'websocket';
-        details.url = decodeURIComponent(matches[1]);
-        var r = onBeforeRequestClient(details);
-        if ( r && r.cancel ) { return r; }
-        // Redirect to the provided URL, or a 1x1 data: URI if none provided.
-        matches = /[?&]r=([^&]+)/.exec(requestURL);
-        return {
-            redirectUrl: matches !== null ?
-                decodeURIComponent(matches[1]) :
-                'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
-        };
-    };
-
-    var onBeforeRequestClient = this.onBeforeRequest.callback;
-    var onBeforeRequest = validTypes.websocket
-        // modern Chromium/WebExtensions: type 'websocket' is supported
-        ? function(details) {
-            normalizeRequestDetails(details);
-            return onBeforeRequestClient(details);
-        }
-        // legacy Chromium
-        : function(details) {
-            // https://github.com/gorhill/uBlock/issues/1497
-            if ( details.url.endsWith('ubofix=f41665f3028c7fd10eecf573336216d3') ) {
-                var r = onBeforeWebsocketRequest(details);
-                if ( r !== undefined ) { return r; }
-            }
-            normalizeRequestDetails(details);
-            return onBeforeRequestClient(details);
-        };
-
-    // This is needed for Chromium 49-55.
-    var onBeforeSendHeaders = validTypes.csp_report
-        // modern Chromium/WebExtensions: type 'csp_report' is supported
-        ? null
-        // legacy Chromium
-        : function(details) {
-            if ( details.type !== 'ping' || details.method !== 'POST' ) { return; }
-            var type = headerValue(details.requestHeaders, 'content-type');
-            if ( type === '' ) { return; }
-            if ( type.endsWith('/csp-report') ) {
-                details.type = 'csp_report';
-                return onBeforeRequestClient(details);
-            }
-        };
-
-    var onHeadersReceivedClient = this.onHeadersReceived.callback,
-        onHeadersReceivedClientTypes = this.onHeadersReceived.types.slice(0),
-        onHeadersReceivedTypes = denormalizeTypes(onHeadersReceivedClientTypes);
-    var onHeadersReceived = validTypes.font
-        // modern Chromium/WebExtensions: type 'font' is supported
-        ? function(details) {
-            normalizeRequestDetails(details);
-            if (
-                onHeadersReceivedClientTypes.length !== 0 &&
-                onHeadersReceivedClientTypes.indexOf(details.type) === -1
-            ) {
-                return;
-            }
-            return onHeadersReceivedClient(details);
-        }
-        // legacy Chromium
-        : function(details) {
-            normalizeRequestDetails(details);
-            // Hack to work around Chromium API limitations, where requests of
-            // type `font` are returned as `other`. For example, our normalization
-            // fail at transposing `other` into `font` for URLs which are outside
-            // what is expected. At least when headers are received we can check
-            // for content type `font/*`. Blocking at onHeadersReceived time is
-            // less worse than not blocking at all. Also, due to Chromium bug,
-            // `other` always becomes `object` when it can't be normalized into
-            // something else. Test case for "unfriendly" font URLs:
-            //   https://www.google.com/fonts
-            if ( details.type === 'font' ) {
-                var r = onBeforeRequestClient(details);
-                if ( typeof r === 'object' && r.cancel === true ) {
-                    return { cancel: true };
-                }
-            }
-            if (
-                onHeadersReceivedClientTypes.length !== 0 &&
-                onHeadersReceivedClientTypes.indexOf(details.type) === -1
-            ) {
-                return;
-            }
-            return onHeadersReceivedClient(details);
-        };
-
-    var urls, types;
-
-    if ( onBeforeRequest ) {
-        urls = this.onBeforeRequest.urls || ['<all_urls>'];
-        types = this.onBeforeRequest.types || undefined;
-        if (
-            (validTypes.websocket) &&
-            (types === undefined || types.indexOf('websocket') !== -1) &&
-            (urls.indexOf('<all_urls>') === -1)
-        ) {
-            if ( urls.indexOf('ws://*/*') === -1 ) {
-                urls.push('ws://*/*');
-            }
-            if ( urls.indexOf('wss://*/*') === -1 ) {
-                urls.push('wss://*/*');
-            }
-        }
-        wrApi.onBeforeRequest.addListener(
-            onBeforeRequest,
-            { urls: urls, types: types },
-            this.onBeforeRequest.extra
-        );
-    }
-
-    // Chromium 48 and lower does not support `ping` type.
-    // Chromium 56 and higher does support `csp_report` stype.
-    if ( onBeforeSendHeaders ) {
-        wrApi.onBeforeSendHeaders.addListener(
-            onBeforeSendHeaders,
-            {
-                'urls': [ '<all_urls>' ],
-                'types': [ 'ping' ]
-            },
-            [ 'blocking', 'requestHeaders' ]
-        );
-    }
-
-    if ( onHeadersReceived ) {
-        urls = this.onHeadersReceived.urls || ['<all_urls>'];
-        types = onHeadersReceivedTypes;
-        wrApi.onHeadersReceived.addListener(
-            onHeadersReceived,
-            { urls: urls, types: types },
-            this.onHeadersReceived.extra
-        );
-    }
-};
-
-/******************************************************************************/
-/******************************************************************************/
-
-vAPI.contextMenu = {
+vAPI.contextMenu = chrome.contextMenus && {
     _callback: null,
     _entries: [],
     _createEntry: function(entry) {
@@ -1213,20 +1011,21 @@ vAPI.onLoadAllCompleted = function() {
     // http://code.google.com/p/chromium/issues/detail?id=410868#c11
     // Need to be sure to access `vAPI.lastError()` to prevent
     // spurious warnings in the console.
-    var scriptDone = function() {
+    var onScriptInjected = function() {
         vAPI.lastError();
     };
     var scriptStart = function(tabId) {
-        vAPI.tabs.injectScript(tabId, {
-            file: 'js/vapi-client.js',
-            allFrames: true,
-            runAt: 'document_idle'
-        }, function(){ });
-        vAPI.tabs.injectScript(tabId, {
-            file: 'js/contentscript.js',
-            allFrames: true,
-            runAt: 'document_idle'
-        }, scriptDone);
+        var manifest = chrome.runtime.getManifest();
+        if ( manifest instanceof Object === false ) { return; }
+        for ( var contentScript of manifest.content_scripts ) {
+            for ( var file of contentScript.js ) {
+                vAPI.tabs.injectScript(tabId, {
+                    file: file,
+                    allFrames: contentScript.all_frames,
+                    runAt: contentScript.run_at
+                }, onScriptInjected);
+            }
+        }
     };
     var bindToTabs = function(tabs) {
         var µb = µBlock;
@@ -1271,7 +1070,7 @@ vAPI.punycodeURL = function(url) {
 // https://github.com/gorhill/uBlock/issues/900
 // Also, UC Browser: http://www.upsieutoc.com/image/WXuH
 
-vAPI.adminStorage = {
+vAPI.adminStorage = chrome.storage.managed && {
     getItem: function(key, callback) {
         var onRead = function(store) {
             var data;
@@ -1307,7 +1106,7 @@ vAPI.cloud = (function() {
     var maxChunkCountPerItem = Math.floor(512 * 0.75) & ~(chunkCountPerFetch - 1);
 
     // Mind chrome.storage.sync.QUOTA_BYTES_PER_ITEM (8192 at time of writing)
-    var maxChunkSize = Math.floor(chrome.storage.sync.QUOTA_BYTES_PER_ITEM * 0.75 || 6144);
+    var maxChunkSize = chrome.storage.sync.QUOTA_BYTES_PER_ITEM || 8192;
 
     // Mind chrome.storage.sync.QUOTA_BYTES (128 kB at time of writing)
     // Firefox:
@@ -1315,9 +1114,22 @@ vAPI.cloud = (function() {
     // > You can store up to 100KB of data using this API/
     var maxStorageSize = chrome.storage.sync.QUOTA_BYTES || 102400;
 
+    // Flavor-specific handling needs to be done here. Reason: to allow time
+    // for vAPI.webextFlavor to be properly set.
+    // https://github.com/gorhill/uBlock/issues/3006
+    //  For Firefox, we will use a lower ratio to allow for more overhead for
+    //  the infrastructure. Unfortunately this leads to less usable space for
+    //  actual data, but all of this is provided for free by browser vendors,
+    //  so we need to accept and deal with these limitations.
+    var initialize = function() {
+        var ratio = vAPI.webextFlavor.startsWith('Mozilla-Firefox-') ? 0.6 : 0.75;
+        maxChunkSize = Math.floor(maxChunkSize * ratio);
+        initialize = function(){};
+    };
+
     var options = {
         defaultDeviceName: window.navigator.platform,
-        deviceName: window.localStorage.getItem('deviceName') || ''
+        deviceName: vAPI.localStorage.getItem('deviceName') || ''
     };
 
     // This is used to find out a rough count of how many chunks exists:
@@ -1364,13 +1176,17 @@ vAPI.cloud = (function() {
         for ( var i = start; i < n; i++ ) {
             keys.push(dataKey + i.toString());
         }
-        chrome.storage.sync.remove(keys);
+        if ( keys.length !== 0 ) {
+            chrome.storage.sync.remove(keys);
+        }
     };
 
     var start = function(/* dataKeys */) {
     };
 
     var push = function(dataKey, data, callback) {
+        initialize();
+
         var bin = {
             'source': options.deviceName || options.defaultDeviceName,
             'tstamp': Date.now(),
@@ -1396,6 +1212,15 @@ vAPI.cloud = (function() {
             var errorStr;
             if ( chrome.runtime.lastError ) {
                 errorStr = chrome.runtime.lastError.message;
+                // https://github.com/gorhill/uBlock/issues/3006#issuecomment-332597677
+                // - Delete all that was pushed in case of failure.
+                // - It's unknown whether such issue applies only to Firefox:
+                //   until such cases are reported for other browsers, we will
+                //   reset the (now corrupted) content of the cloud storage
+                //   only on Firefox.
+                if ( vAPI.webextFlavor.startsWith('Mozilla-Firefox-') ) {
+                    chunkCount = 0;
+                }
             }
             callback(errorStr);
 
@@ -1405,6 +1230,8 @@ vAPI.cloud = (function() {
     };
 
     var pull = function(dataKey, callback) {
+        initialize();
+
         var assembleChunks = function(bin) {
             if ( chrome.runtime.lastError ) {
                 callback(null, chrome.runtime.lastError.message);
@@ -1461,7 +1288,7 @@ vAPI.cloud = (function() {
         }
 
         if ( typeof details.deviceName === 'string' ) {
-            window.localStorage.setItem('deviceName', details.deviceName);
+            vAPI.localStorage.setItem('deviceName', details.deviceName);
             options.deviceName = details.deviceName;
         }
 
