@@ -1,7 +1,7 @@
 /*******************************************************************************
 
     uBlock Origin - a browser extension to block requests.
-    Copyright (C) 2014-2016 The uBlock Origin authors
+    Copyright (C) 2014-2018 The uBlock Origin authors
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -536,32 +536,34 @@ vAPI.tabs.registerListeners = function() {
 
 /******************************************************************************/
 
-vAPI.tabs.get = function(tabId, callback) {
-    var onTabReady = function(tab) {
-        // https://code.google.com/p/chromium/issues/detail?id=410868#c8
-        if ( browser.runtime.lastError ) {
-            /* noop */
-        }
-        // Caller must be prepared to deal with nil tab value
-        callback(tab);
-    };
+// Caller must be prepared to deal with nil tab argument.
 
-    if ( tabId !== null ) {
-        tabId = toEdgeTabId(tabId);
-        if ( tabId === 0 ) {
-            onTabReady(null);
-        } else {
-            browser.tabs.get(tabId, onTabReady);
-        }
+// https://code.google.com/p/chromium/issues/detail?id=410868#c8
+
+vAPI.tabs.get = function(tabId, callback) {
+    if ( tabId === null ) {
+        browser.tabs.query(
+            { active: true, currentWindow: true },
+            function(tabs) {
+                if ( browser.runtime.lastError ) { /* noop */ }
+                callback(
+                    Array.isArray(tabs) && tabs.length !== 0 ? tabs[0] : null
+                );
+            }
+        );
         return;
     }
 
-    var onTabReceived = function(tabs) {
-        // https://code.google.com/p/chromium/issues/detail?id=410868#c8
-        void browser.runtime.lastError;
-        callback(tabs[0]);
-    };
-    browser.tabs.query({ active: true, currentWindow: true }, onTabReceived);
+    tabId = toEdgeTabId(tabId);
+    if ( tabId === 0 ) {
+        callback(null);
+        return;
+    }
+
+    browser.tabs.get(tabId, function(tab) {
+        if ( browser.runtime.lastError ) { /* noop */ }
+        callback(tab);
+    });
 };
 
 /******************************************************************************/
@@ -731,7 +733,7 @@ vAPI.tabs.remove = function(tabId) {
 
 /******************************************************************************/
 
-vAPI.tabs.reload = function(tabId /*, flags*/) {
+vAPI.tabs.reload = function(tabId, bypassCache) {
     tabId = toEdgeTabId(tabId);
     if ( tabId === 0 ) {
         return;
@@ -745,7 +747,7 @@ vAPI.tabs.reload = function(tabId /*, flags*/) {
             /* noop */
             return;
         }
-        vAPI.tabs.injectScript(tabId, { code: 'window.location.reload()' });
+        vAPI.tabs.injectScript(tabId, { code: `window.location.reload(${!!bypassCache})` });
     });
 };
 
@@ -935,8 +937,7 @@ vAPI.messaging.onPortMessage = (function() {
     var toFramework = function(request, port, callback) {
         var sender = port && port.sender;
         if ( !sender ) { return; }
-        var tabId = sender.tab && sender.tab.id;
-        if ( !tabId ) { return; }
+        var tabId = sender.tab && sender.tab.id || undefined;
         var msg = request.msg,
             toPort;
         switch ( msg.what ) {
@@ -944,7 +945,7 @@ vAPI.messaging.onPortMessage = (function() {
             case 'connectionRefused':
                 toPort = messaging.ports.get(msg.fromToken);
                 if ( toPort !== undefined ) {
-                    msg.tabId = tabId.toString();
+                    msg.tabId = tabId && tabId.toString();
                     toPort.postMessage(request);
                 } else {
                     msg.what = 'connectionBroken';
@@ -952,7 +953,7 @@ vAPI.messaging.onPortMessage = (function() {
                 }
                 break;
             case 'connectionRequested':
-                msg.tabId = '' + tabId.toString();
+                msg.tabId = tabId && tabId.toString();
                 for ( toPort of messaging.ports.values() ) {
                     toPort.postMessage(request);
                 }
@@ -964,7 +965,7 @@ vAPI.messaging.onPortMessage = (function() {
                     port.name === msg.fromToken ? msg.toToken : msg.fromToken
                 );
                 if ( toPort !== undefined ) {
-                    msg.tabId = tabId.toString();
+                    msg.tabId = tabId && tabId.toString();
                     toPort.postMessage(request);
                 } else {
                     msg.what = 'connectionBroken';
@@ -972,6 +973,7 @@ vAPI.messaging.onPortMessage = (function() {
                 }
                 break;
             case 'userCSS':
+                if ( tabId === undefined ) { break; }
                 var details = {
                     code: undefined,
                     frameId: sender.frameId,
