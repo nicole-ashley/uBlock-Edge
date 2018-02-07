@@ -21,6 +21,7 @@ cp platform/edge/*.js   $DES/js/
 cp -R platform/edge/img $DES/
 cp platform/edge/*.html $DES/
 cp platform/edge/*.json $DES/
+cp -R platform/edge/*.css $DES/css
 cp LICENSE.txt              $DES/
 
 echo "*** uBlock0.edge: concatenating content scripts"
