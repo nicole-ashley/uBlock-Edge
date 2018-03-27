@@ -33,7 +33,11 @@ rm $DES/js/vapi-usercss.js
 
 sed -i "s/'fullwide',\s*//g" $DES/js/*.js
 
-cp -R $DES/_locales/nb      $DES/_locales/no
+cp -R $DES/_locales/nb $DES/_locales/no
+
+echo "*** uBlock0.edge: Generating web accessible resources..."
+cp -R src/web_accessible_resources $DES/
+python3 tools/import-war.py $DES/
 
 echo "*** uBlock0.edge: Generating meta..."
 python tools/make-edge-meta.py $DES/

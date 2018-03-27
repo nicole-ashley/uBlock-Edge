@@ -20,6 +20,17 @@ def mkdirs(path):
 
 pj = os.path.join
 
+# Find path to project root
+proj_dir = os.path.split(os.path.abspath(__file__))[0]
+while not os.path.isdir(os.path.join(proj_dir, '.git')):
+    proj_dir = os.path.normpath(os.path.join(proj_dir, '..'))
+
+# Check that found project root is valid
+version_filepath = os.path.join(proj_dir, 'dist', 'version')
+if not os.path.isfile(version_filepath):
+    print('Version file not found.')
+    exit(1)
+
 build_dir = os.path.abspath(sys.argv[1])
 source_locale_dir = pj(build_dir, '_locales')
 target_locale_dir = pj(build_dir, 'locale')
@@ -60,23 +71,27 @@ with open(chrome_manifest, 'at', encoding='utf-8', newline='\n') as f:
 rmtree(source_locale_dir)
 
 # update install.rdf
-proj_dir = pj(os.path.split(os.path.abspath(__file__))[0], '..')
-chromium_manifest = pj(proj_dir, 'platform', 'chromium', 'manifest.json')
 
+chromium_manifest = pj(proj_dir, 'platform', 'chromium', 'manifest.json')
 with open(chromium_manifest, encoding='utf-8') as m:
     manifest = json.load(m)
 
+# Fetch extension version
 # https://developer.mozilla.org/en-US/Add-ons/AMO/Policy/Maintenance#How_do_I_submit_a_Beta_add-on.3F
 # "To create a beta channel [...] '(a|alpha|b|beta|pre|rc)\d*$' "
 
-match = re.search('^(\d+\.\d+\.\d+)(\.\d+)$', manifest['version'])
+version = ''
+with open(version_filepath) as f:
+    version = f.read().strip()
+match = re.search('^(\d+\.\d+\.\d+)(\.\d+)$', version)
 if match:
     buildtype = int(match.group(2)[1:])
     if buildtype < 100:
         builttype = 'b' + str(buildtype)
     else:
         builttype = 'rc' + str(buildtype - 100)
-    manifest['version'] = match.group(1) + builttype
+    version = match.group(1) + builttype
+manifest['version'] = version
 
 manifest['homepage'] = 'https://github.com/gorhill/uBlock'
 manifest['description'] = descriptions['en']
