@@ -105,6 +105,14 @@ vAPI.net.registerListeners = function() {
     };
 
     var normalizeRequestDetails = function(details) {
+        if (
+            details.tabId === vAPI.noTabId &&
+            typeof details.initiator === 'string'
+        ) {
+            details.tabId = vAPI.anyTabId;
+            details.documentUrl = details.initiator;
+        }
+
         var type = details.type;
 
         // https://github.com/gorhill/uBlock/issues/1493

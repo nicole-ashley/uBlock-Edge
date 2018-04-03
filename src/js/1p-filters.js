@@ -42,6 +42,8 @@ var cmEditor = new CodeMirror(
     }
 );
 
+uBlockDashboard.patchCodeMirrorEditor(cmEditor);
+
 /******************************************************************************/
 
 // This is to give a visual hint that the content of user blacklist has changed.
@@ -66,6 +68,7 @@ function renderUserFilters(first) {
         }
         cmEditor.setValue(content);
         if ( first ) {
+            cmEditor.setCursor(cmEditor.lineCount(), 0);
             cmEditor.clearHistory();
         }
         userFiltersChanged(false);
