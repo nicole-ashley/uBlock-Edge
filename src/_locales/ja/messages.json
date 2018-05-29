@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "uBlock₀",
+    "message": "uBlock Origin",
     "description": "extension name."
   },
   "extShortDesc": {
@@ -16,7 +16,7 @@
     "description": "appears as tab name in dashboard"
   },
   "3pPageName": {
-    "message": "外部フィルター",
+    "message": "フィルター一覧",
     "description": "appears as tab name in dashboard"
   },
   "1pPageName": {
@@ -351,6 +351,10 @@
     "message": "適用",
     "description": "English: Apply changes"
   },
+  "3pGroupDefault": {
+    "message": "内製フィルター",
+    "description": "Header for the uBlock filters section in 'Filter lists pane'"
+  },
   "3pGroupAds": {
     "message": "広告",
     "description": "English: Ads"
@@ -360,7 +364,7 @@
     "description": "English: Privacy"
   },
   "3pGroupMalware": {
-    "message": "ウイルス",
+    "message": "マルウェア ドメイン",
     "description": "English: Malware domains"
   },
   "3pGroupAnnoyances": {
@@ -379,9 +383,13 @@
     "message": "カスタム",
     "description": "English: Custom"
   },
+  "3pImport": {
+    "message": "インポート...",
+    "description": "The label for the checkbox used to import external filter lists"
+  },
   "3pExternalListsHint": {
-    "message": "URL1つにつき1行です。&lsquo;!&rsquo; が先頭にある行は無視されます。無効なURLもそのまま無視されます。",
-    "description": "English: One URL per line. Lines prefixed with &lsquo;!&rsquo; will be ignored. Invalid URLs will be silently ignored."
+    "message": "URL1つにつき1行です。無効なURLは無視されます。",
+    "description": "Short information about how to use the textarea to import external filter lists by URL"
   },
   "3pExternalListObsolete": {
     "message": "古いバージョンです",
@@ -400,8 +408,8 @@
     "description": "used as a tooltip for error icon beside a list"
   },
   "1pFormatHint": {
-    "message": "1行につき1つのフィルターです。フィルターはただのホストネームでもAdblock Plus適合のフィルターでも構いません。&lsquo;!&rsquo;ですでに固定されている行は無視されます。",
-    "description": "English: One filter per line. A filter can be a plain hostname, or an Adblock Plus-compatible filter. Lines prefixed with &lsquo;!&rsquo; will be ignored."
+    "message": "1行につき1つのフィルターです。フィルターはただのホストネームでもAdblock Plus書式のフィルターでも構いません。<code>!<\/code> が先頭にある行は無視されます。",
+    "description": "Short information about how to create custom filters"
   },
   "1pImport": {
     "message": "インポートと追加",
@@ -580,7 +588,7 @@
     "description": "Below this sentence, the filter lists in which the filter was found"
   },
   "aboutChangelog": {
-    "message": "バージョン更新履歴 (Change log)",
+    "message": "更新履歴",
     "description": "English: Change log"
   },
   "aboutWiki": {
@@ -590,6 +598,10 @@
   "aboutSupport": {
     "message": "サポート",
     "description": "A link for where to get support"
+  },
+  "aboutIssues": {
+    "message": "問題追跡システム",
+    "description": "Text for a link to official issue tracker"
   },
   "aboutCode": {
     "message": "ソースコード (GPLバージョン3)",

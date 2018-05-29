@@ -34,7 +34,7 @@
 
     var pc = null;
     try {
-        var PC = self.RTCPeerConnection || self.webkitRTCPeerConnection;
+        var PC = self.RTCPeerConnection;
         if ( PC ) {
             pc = new PC(null);
         }

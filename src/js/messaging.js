@@ -434,7 +434,7 @@ var onMessage = function(request, sender, callback) {
         pageStore = µb.pageStoreFromTabId(request.tabId);
         if ( pageStore ) {
             pageStore.toggleNetFilteringSwitch(request.url, request.scope, request.state);
-            µb.updateBadgeAsync(request.tabId);
+            µb.updateToolbarIcon(request.tabId, 0x03);
         }
         break;
 
@@ -517,16 +517,7 @@ var onMessage = function(request, sender, callback) {
         request.entity = µb.URI.entityFromDomain(request.domain);
         response.specificCosmeticFilters =
             µb.cosmeticFilteringEngine.retrieveDomainSelectors(request, response);
-        // If response body filtering is supported, than the scriptlets have
-        // already been injected.
-        if (
-            µb.canFilterResponseBody === false ||
-            µb.hiddenSettings.streamScriptInjectFilters !== true ||
-            µb.textEncode === undefined ||
-            µb.textEncode.normalizeCharset(request.charset) === undefined
-        ) {
-            response.scriptlets = µb.scriptletFilteringEngine.retrieve(request);
-        }
+        response.scriptlets = µb.scriptletFilteringEngine.retrieve(request);
         if ( request.isRootFrame && µb.logger.isEnabled() ) {
             µb.logCosmeticFilters(tabId);
         }

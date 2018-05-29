@@ -1,3 +1,8 @@
+[![Crowdin](https://d322cqt584bo4o.cloudfront.net/ublock/localized.svg)](https://crowdin.com/project/ublock)
+[![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/nikrolls/uBlock-Edge/blob/master/LICENSE.txt)
+
+*** 
+
 <h1 align="center">
 <sub>
 <img  src="https://raw.githubusercontent.com/gorhill/uBlock/master/doc/img/icon38@2x.png"
@@ -70,8 +75,8 @@ really do want to contribute something, think about the people working hard
 to maintain the filter lists you are using, which were made available to use by
 all for free.
 
-You can contribute by helping translate uBlock₀ [on Crowdin](https://crowdin.net/project/ublock).
+You can contribute by helping translate uBlock Origin [on Crowdin](https://crowdin.net/project/ublock).
 
 ## License
 
-[GPLv3](LICENSE.txt).
+[GPLv3](https://github.com/nikrolls/uBlock-Edge/blob/master/LICENSE.txt).

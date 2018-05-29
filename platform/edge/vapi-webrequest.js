@@ -107,7 +107,8 @@ vAPI.net.registerListeners = function() {
     var normalizeRequestDetails = function(details) {
         if (
             details.tabId === vAPI.noTabId &&
-            typeof details.initiator === 'string'
+            typeof details.initiator === 'string' &&
+            details.initiator !== 'null'
         ) {
             details.tabId = vAPI.anyTabId;
             details.documentUrl = details.initiator;

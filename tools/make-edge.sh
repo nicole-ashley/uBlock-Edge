@@ -18,7 +18,6 @@ cp -R src/lib               $DES/
 cp -R src/_locales          $DES/
 cp src/*.html               $DES/
 cp platform/edge/*.js   $DES/js/
-cp -R platform/edge/img $DES/
 cp platform/edge/*.html $DES/
 cp platform/edge/*.json $DES/
 cp -R platform/edge/*.css $DES/css
@@ -27,9 +26,12 @@ cp LICENSE.txt              $DES/
 echo "*** uBlock0.edge: concatenating content scripts"
 cat $DES/js/vapi-usercss.js > /tmp/contentscript.js
 echo >> /tmp/contentscript.js
+grep -v "^'use strict';$" $DES/js/vapi-usercss.real.js >> /tmp/contentscript.js
+echo >> /tmp/contentscript.js
 grep -v "^'use strict';$" $DES/js/contentscript.js >> /tmp/contentscript.js
 mv /tmp/contentscript.js $DES/js/contentscript.js
 rm $DES/js/vapi-usercss.js
+rm $DES/js/vapi-usercss.real.js
 
 sed -i "s/'fullwide',\s*//g" $DES/js/*.js
 
