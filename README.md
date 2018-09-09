@@ -37,7 +37,7 @@ In the first instance, issues should be reported in [uBlock’s section of the F
 
 ## Performance and Efficiency
 
-Early tests of performance of this extension on the Microsoft Edge browser are positive, though more are required to share useful data here. This fork shares the majority of its code with the Chrome and Firefox versions which have been [proven to be faster than AdBlock Pro](https://github.com/gorhill/uBlock#performance).
+Early tests of performance of this extension on the Microsoft Edge browser are positive, though more are required to share useful data here. This fork shares the majority of its code with the Chrome and Firefox versions which have been [proven to be faster than AdBlock Plus](https://github.com/gorhill/uBlock#performance).
 
 ## Installation
 
