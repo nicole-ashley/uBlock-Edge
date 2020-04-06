@@ -1,15 +1,9 @@
-[![Crowdin](https://d322cqt584bo4o.cloudfront.net/ublock/localized.svg)](https://crowdin.com/project/ublock)
-[![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/nikrolls/uBlock-Edge/blob/master/LICENSE.txt)
-
-*** 
-
 <h1 align="center">
 <sub>
-<img  src="https://raw.githubusercontent.com/gorhill/uBlock/master/doc/img/icon38@2x.png"
-      height="38"
-      width="38">
+<img src="https://raw.githubusercontent.com/nikrolls/uBlock-Edge/master/doc/img/icon38@2x.png"
+     height="38" width="38">
 </sub>
-uBlock Origin <sup>Beta</sup> <br/>
+uBlock Origin<br/>
 <small>for Microsoft Edge</small>
 </h1>
 <p align="center">
@@ -19,64 +13,33 @@ uBlock Origin <sup>Beta</sup> <br/>
 </p>
 
 
-**An efficient blocker add-on for Microsoft Edge. Fast, potent, and lean.**
+**uBlock Origin is now maintained in the core repository**
 
-## Note: This port of uBlock Origin to Microsoft Edge is in early development
-While most of the code in this extension is shared with [upstream](https://github.com/gorhill/uBlock), the platform layer is not finished and there is no guarantee of stability, performance, or complete feature parity until the extension is published on the Microsoft Store.
+As the new Microsoft Edge is based on Chromium, development of uBlock Origin for Microsoft is done entirely in the core 
+repository, as Microsoft Edge's extension platform is the same as Chromium's. To contribute pull requests or report 
+issues, go to the core repository at https://github.com/gorhill/uBlock.
 
-* [Issues](#issues)
-* [Performance and Efficiency](#performance)
-* [Installation](#installation)
-* [Release History](#release-history)
-* [About](#about)
-* [License](#license)
+**Downloading uBlock Origin for Microsoft Edge**
 
-## Issues
+Check the icon for Edge on your computer and match it to the instructions below:
 
-In the first instance, issues should be reported in [uBlock’s section of the Feedback Hub](feedback-hub://?tabid=2&appid=37833NikRolls.uBlockOrigin_f8jsg5mm64m62!App). If this is not working for you, please [create a new GitHub issue](https://github.com/nikrolls/uBlock-Edge/issues) and complete the provided template.
+<h3>
+<img src="https://raw.githubusercontent.com/nikrolls/uBlock-Edge/master/doc/img/new_edge_logo@2x.png"
+     height="100" width="100"><br/>
+New Edge based on Chromium
+</h3>
 
-## Performance and Efficiency
+You can install the latest version of 
+[uBlock Origin from the Microsoft Edge Add-ons store](https://microsoftedge.microsoft.com/addons/detail/odfafepnkmbhccpbejgmiehpchacaeak).
+This is kept up-to-date with the latest version on the Chrome Web Store.
 
-Early tests of performance of this extension on the Microsoft Edge browser are positive, though more are required to share useful data here. This fork shares the majority of its code with the Chrome and Firefox versions which have been [proven to be faster than AdBlock Plus](https://github.com/gorhill/uBlock#performance).
+<h3>
+<img src="https://raw.githubusercontent.com/nikrolls/uBlock-Edge/master/doc/img/old_edge_logo@2x.png"
+     height="100" width="100"><br/>
+Legacy Edge
+</h3>
 
-## Installation
-
-Feel free to read [about the extension's required permissions](https://github.com/gorhill/uBlock/wiki/About-the-required-permissions).
-
-You can download the [latest release from the Microsoft Store](https://www.microsoft.com/store/p/app/9nblggh444l4).
-
-To install beta releases directly from GitHub, you will need to side-load the extension:
-
-1. Download the latest release from [the Releases page](https://github.com/nikrolls/uBlock-Edge/releases)
-2. Extract the zip file somewhere safe (it will need to remain there as long as you use the extension)
-3. Browse to `about:flags` in Edge and turn on the option `Enable extension developer features`
-4. Restart your browser
-5. Go to Extensions in the browser menu and click `Load extension`
-6. Select the `uBlock0.edge` folder you extracted earlier
-
-Edge disables side-loaded extensions whenever you restart the browser. However after a few seconds you will get a prompt to re-enable them with a single click.
-
-#### Note
-
-To benefit from uBlock Origin's higher efficiency, it's advised that you don't use other inefficient blockers at the same time (such as AdBlock or Adblock Plus). uBlock₀ will do as well or better than most popular ad blockers. Other blockers can also prevent uBlock₀'s privacy or anti-blocker features from working properly.
-
-## Release History
-
-See the [releases pages](https://github.com/nikrolls/uBlock-Edge/releases) for a history of releases and highlights for each release.
-
-## About
-
-[uBlock Origin's manifesto](MANIFESTO.md).
-
-Free. Open source. For users by users. No donations sought.
-
-Without the preset lists of filters, this extension is nothing. So if ever you
-really do want to contribute something, think about the people working hard
-to maintain the filter lists you are using, which were made available to use by
-all for free.
-
-You can contribute by helping translate uBlock Origin [on Crowdin](https://crowdin.net/project/ublock).
-
-## License
-
-[GPLv3](https://github.com/nikrolls/uBlock-Edge/blob/master/LICENSE.txt).
+Due to the complexities and time requirements to maintain compatibility with the legacy version of Microsoft Edge, this
+fork is no longer supported. It is **highly recommended** that you upgrade your version of Microsoft Edge by
+[downloading the update at Microsoft's website](https://www.microsoft.com/en-us/edge). Once you have updated, follow the
+instructions above for installation of uBlock Origin on New Edge.
